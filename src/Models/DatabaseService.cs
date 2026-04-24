@@ -1,5 +1,5 @@
 using Dapper;
-using KitsuneSteamRestrict;
+using SteamRestrict;
 using MySqlConnector;
 
 public class DatabaseService
@@ -27,7 +27,7 @@ public class DatabaseService
 	{
 		using var connection = new MySqlConnection(_connectionString);
 		await connection.ExecuteAsync(
-			$"INSERT INTO `{_tablePrefix}allowed_users` (`steam_id`, `expiration_date`) VALUES (@steamId, DATE_ADD(NOW(), INTERVAL @daysValid DAY))",
+			$"INSERT INTO `{_tablePrefix}allowed_users` (`steam_id`, `expiration_date`) VALUES (@steamId, DATE_ADD(NOW(), INTERVAL @daysValid DAY)) ON DUPLICATE KEY UPDATE `expiration_date` = DATE_ADD(NOW(), INTERVAL @daysValid DAY)",
 			new { steamId, daysValid });
 	}
 

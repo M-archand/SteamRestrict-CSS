@@ -1,6 +1,6 @@
-using System.Text.Json;
+using Newtonsoft.Json;
 
-namespace KitsuneSteamRestrict
+namespace SteamRestrict
 {
 	public class PlayerBypassConfig
 	{
@@ -9,6 +9,7 @@ namespace KitsuneSteamRestrict
 		public bool BypassMinimumLevel { get; set; } = false;
 		public bool BypassMinimumSteamAccountAge { get; set; } = false;
 		public bool BypassPrivateProfile { get; set; } = false;
+		public bool BypassUnconfiguredProfile { get; set; } = false;
 		public bool BypassTradeBanned { get; set; } = false;
 		public bool BypassVACBanned { get; set; } = false;
 		public bool BypassSteamGroupCheck { get; set; } = false;
@@ -52,7 +53,10 @@ namespace KitsuneSteamRestrict
 			if (File.Exists(_configFilePath))
 			{
 				string json = File.ReadAllText(_configFilePath);
-				var playerConfigs = JsonSerializer.Deserialize<Dictionary<ulong, PlayerBypassConfig>>(json)!;
+				var playerConfigs = JsonConvert.DeserializeObject<Dictionary<ulong, PlayerBypassConfig>>(json);
+				if (playerConfigs == null)
+					return new BypassConfig();
+
 				var bypassConfig = new BypassConfig();
 
 				foreach (var kvp in playerConfigs)
@@ -66,7 +70,7 @@ namespace KitsuneSteamRestrict
 			{
 				var defaultConfig = new BypassConfig();
 
-				defaultConfig.AddPlayerConfig(76561198345583467, new PlayerBypassConfig
+				defaultConfig.AddPlayerConfig(76561197960434622, new PlayerBypassConfig
 				{
 					BypassMinimumCS2Level = true,
 					BypassMinimumHours = false,
@@ -79,7 +83,7 @@ namespace KitsuneSteamRestrict
 					BypassGameBanned = true
 				});
 
-				defaultConfig.AddPlayerConfig(76561198132924835, new PlayerBypassConfig
+				defaultConfig.AddPlayerConfig(76561197985607672, new PlayerBypassConfig
 				{
 					BypassMinimumCS2Level = false,
 					BypassMinimumHours = true,
@@ -92,7 +96,7 @@ namespace KitsuneSteamRestrict
 					BypassGameBanned = false
 				});
 
-				string json = JsonSerializer.Serialize(defaultConfig.GetAllPlayerConfigs(), new JsonSerializerOptions { WriteIndented = true });
+				string json = JsonConvert.SerializeObject(defaultConfig.GetAllPlayerConfigs(), Formatting.Indented);
 				File.WriteAllText(_configFilePath, json);
 
 				return defaultConfig;

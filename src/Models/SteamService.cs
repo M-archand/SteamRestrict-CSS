@@ -1,5 +1,5 @@
 
-using KitsuneSteamRestrict;
+using SteamRestrict;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 
@@ -11,6 +11,7 @@ public class SteamUserInfo
 	public int CS2Playtime { get; set; }
 	public bool IsPrivate { get; set; }
 	public bool IsGameDetailsPrivate { get; set; }
+	public bool IsProfileConfigured { get; set; }
 	public bool HasPrime { get; set; }
 	public bool IsTradeBanned { get; set; }
 	public bool IsVACBanned { get; set; }
@@ -37,13 +38,18 @@ public class SteamService
 
 	public async Task FetchSteamUserInfo(string steamId)
 	{
+		var cs2PlaytimeTask = FetchCS2PlaytimeAsync(steamId);
+		var steamLevelTask = FetchSteamLevelAsync(steamId);
+		var profilePrivacyTask = FetchProfilePrivacyAsync(steamId, UserInfo!);
+		var tradeBanTask = FetchTradeBanStatusAsync(steamId, UserInfo!);
+		var gameBanTask = FetchGameBanStatusAsync(steamId, UserInfo!);
+		var groupMembershipTask = FetchSteamGroupMembershipAsync(steamId, UserInfo!);
+
+		await Task.WhenAll(cs2PlaytimeTask, steamLevelTask, profilePrivacyTask, tradeBanTask, gameBanTask, groupMembershipTask);
+
 		//UserInfo.HasPrime = await FetchHasPrimeAsync(steamId);
-		UserInfo!.CS2Playtime = await FetchCS2PlaytimeAsync(steamId) / 60;
-		UserInfo.SteamLevel = await FetchSteamLevelAsync(steamId);
-		await FetchProfilePrivacyAsync(steamId, UserInfo);
-		await FetchTradeBanStatusAsync(steamId, UserInfo);
-		await FetchGameBanStatusAsync(steamId, UserInfo);
-		await FetchSteamGroupMembershipAsync(steamId, UserInfo);
+		UserInfo!.CS2Playtime = cs2PlaytimeTask.Result / 60;
+		UserInfo.SteamLevel = steamLevelTask.Result;
 	}
 
 	private async Task<int> FetchCS2PlaytimeAsync(string steamId)
@@ -55,7 +61,7 @@ public class SteamService
 
 	private async Task<int> FetchSteamLevelAsync(string steamId)
 	{
-		var url = $"http://api.steampowered.com/IPlayerService/GetSteamLevel/v1/?key={_steamWebAPIKey}&steamid={steamId}";
+		var url = $"https://api.steampowered.com/IPlayerService/GetSteamLevel/v1/?key={_steamWebAPIKey}&steamid={steamId}";
 		var json = await GetApiResponseAsync(url);
 		return json != null ? ParseSteamLevel(json) : 0;
 	}
@@ -89,7 +95,7 @@ public class SteamService
 	{
 		if (!string.IsNullOrEmpty(_config.SteamGroupID))
 		{
-			var url = $"http://api.steampowered.com/ISteamUser/GetUserGroupList/v1/?key={_steamWebAPIKey}&steamid={steamId}";
+			var url = $"https://api.steampowered.com/ISteamUser/GetUserGroupList/v1/?key={_steamWebAPIKey}&steamid={steamId}";
 			var json = await GetApiResponseAsync(url);
 
 			userInfo.IsInSteamGroup = false;
@@ -146,7 +152,8 @@ public class SteamService
 		if (player != null)
 		{
 			userInfo.IsPrivate = player["communityvisibilitystate"]?.ToObject<int?>() != 3;
-			userInfo.IsGameDetailsPrivate = player["gameextrainfo"] == null;
+			userInfo.IsGameDetailsPrivate = false;
+			userInfo.IsProfileConfigured = player["profilestate"]?.ToObject<int?>() == 1;
 			int? timeCreated = player["timecreated"]?.ToObject<int?>();
 			userInfo.SteamAccountAge = timeCreated.HasValue
 				? new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc).AddSeconds(timeCreated.Value)
